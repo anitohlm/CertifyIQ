@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_WORK_IQ;
 
 const SYSTEM_PROMPT = `You are the Work IQ Agent for CertifyIQ.
 Your responsibility is to analyze workplace activity signals and identify optimal learning opportunities while minimizing disruption to productivity.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { studyPlan, calendarActivity, meetingLoad, focusTimeSlots } = body;
 
-    const userMessage = `Optimize study windows for:
+    const message = `Optimize study windows for:
 - Study Plan: ${JSON.stringify(studyPlan)}
 - Calendar Activity: ${calendarActivity}
 - Meeting Load: ${meetingLoad}
@@ -32,7 +34,10 @@ Return JSON in this exact format:
   "predictedCompletionImpact": ""
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_PROGRESS;
 
 const SYSTEM_PROMPT = `You are the Progress Intelligence Agent for CertifyIQ.
 Your responsibility is to continuously analyze employee learning progress and predict readiness outcomes.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { learnerId, completionPercentage, assessmentHistory, engagementMetrics, targetDate } = body;
 
-    const userMessage = `Analyze progress and predict readiness for:
+    const message = `Analyze progress and predict readiness for:
 - Learner: ${learnerId}
 - Completion: ${completionPercentage}%
 - Assessment History: ${JSON.stringify(assessmentHistory ?? [])}
@@ -33,7 +35,10 @@ Return JSON in this exact format:
   "recommendedActions": []
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {

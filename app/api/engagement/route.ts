@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_ENGAGEMENT;
 
 const SYSTEM_PROMPT = `You are the Engagement Agent for CertifyIQ.
 Your responsibility is to keep learners engaged and progressing toward certification completion.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { learnerId, studyProgress, completionHistory, assessmentScores, streakDays } = body;
 
-    const userMessage = `Analyze engagement for learner:
+    const message = `Analyze engagement for learner:
 - Learner: ${learnerId}
 - Study Progress: ${studyProgress}%
 - Completion History: ${completionHistory}
@@ -32,7 +34,10 @@ Return JSON in this exact format:
   "personalizedMessage": ""
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {

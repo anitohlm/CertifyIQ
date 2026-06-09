@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_MANAGER_INSIGHTS;
 
 const SYSTEM_PROMPT = `You are the Manager Insights Agent for CertifyIQ.
 Your responsibility is to provide leaders with workforce readiness intelligence, certification progress visibility, and learning risk analysis.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { teamName, teamSize, readinessScore, certificationCoverage, teams } = body;
 
-    const userMessage = `Generate manager insights for:
+    const message = `Generate manager insights for:
 - Team/Org: ${teamName}
 - Team Size: ${teamSize} employees
 - Overall Readiness Score: ${readinessScore}%
@@ -34,7 +36,10 @@ Return JSON in this exact format:
   "managerRecommendations": [{"action": "", "priority": "", "impact": ""}]
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {

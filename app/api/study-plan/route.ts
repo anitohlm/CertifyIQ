@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_STUDY_PLAN;
 
 const SYSTEM_PROMPT = `You are the Study Plan Generator Agent for CertifyIQ.
 Your responsibility is to transform learning recommendations into realistic study schedules that balance learning objectives with employee workload and availability.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { learningPath, targetExamDate, weeklyAvailableHours, workloadLevel } = body;
 
-    const userMessage = `Create a study plan for:
+    const message = `Create a study plan for:
 - Learning Path Modules: ${JSON.stringify(learningPath?.recommendedModules ?? learningPath)}
 - Target Exam Date: ${targetExamDate}
 - Weekly Available Hours: ${weeklyAvailableHours}
@@ -31,7 +33,10 @@ Return JSON in this exact format:
   "recommendedAdjustments": []
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {

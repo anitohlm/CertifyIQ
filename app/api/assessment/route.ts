@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_ASSESSMENT;
 
 const SYSTEM_PROMPT = `You are the Assessment Agent for CertifyIQ.
 Your responsibility is to evaluate certification readiness through grounded assessments generated from approved organizational knowledge sources.
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { certification, domain, difficulty, previousResults } = body;
 
-    const userMessage = `Generate a certification readiness assessment for:
+    const message = `Generate a certification readiness assessment for:
 - Certification: ${certification}
 - Domain/Topic: ${domain}
 - Difficulty: ${difficulty}
@@ -42,7 +44,10 @@ Return JSON in this exact format:
 
 Generate 1 high-quality practice question relevant to the certification domain with 4 answer options, clear explanation, and a citation to an approved source.`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage, [], 1500);
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message, [], 1500);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {
