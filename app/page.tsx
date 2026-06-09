@@ -30,6 +30,10 @@ interface StudyPlanResult { studyPlan: Array<{ week: string; activities: string[
 interface WorkIQResult { recommendedStudyWindows: Array<{ day: string; time: string; duration: string; reason: string }>; workloadRisk: string; scheduleConflicts: string[]; optimizationRecommendations: string[]; predictedCompletionImpact: string; }
 interface ManagerInsightsResult { teamReadinessScore: string; certificationCoverage: string; highRiskEmployees: string[]; skillGapSummary: Array<{ skill: string; affectedCount: number; urgency: string }>; forecastedCompletion: string; managerRecommendations: Array<{ action: string; priority: string; impact: string }>; }
 
+type WorkflowType = "certification-planning" | "readiness-evaluation" | "struggling-learner" | "manager-request" | "engagement-check" | "general-coaching" | "unknown";
+interface OrchestratorSummary { keyFindings: string[]; recommendedActions: string[]; risksOrBlockers: string[]; nextBestStep: string; conflictNotes?: string; }
+interface OrchestratorResult { requestId: string; workflow: WorkflowType; workflowLabel: string; userObjective: string; agentsConsulted: string[]; findings: Record<string, unknown>; errors: Record<string, string>; summary: OrchestratorSummary; durationMs: number; }
+
 // ─── Static data ─────────────────────────────────────────────────────────────
 
 const learnerNav: Array<{ icon: typeof HomeIcon; label: string; page: Page }> = [
@@ -1447,6 +1451,7 @@ function AIStudioPage({
   assessment, assessmentLoading,
   managerInsights, insightsLoadingProp,
   onRunChain, onRunInsights, onGenerateAssessment,
+  orchResult, orchLoading, orchRequest, onOrchRequestChange, onRunOrchestrator,
 }: {
   view: "employee" | "manager";
   agentStatuses: Record<string, AgentStatus>;
@@ -1462,6 +1467,11 @@ function AIStudioPage({
   onRunChain: () => void;
   onRunInsights: () => void;
   onGenerateAssessment: () => void;
+  orchResult: OrchestratorResult | null;
+  orchLoading: boolean;
+  orchRequest: string;
+  onOrchRequestChange: (v: string) => void;
+  onRunOrchestrator: (req: string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => { setSelected(null); }, [assessment]);
@@ -1605,8 +1615,237 @@ function AIStudioPage({
         {!assessmentLoading && !q && <div className="mt-4 rounded-lg border border-slate-200 bg-white/75 p-4 text-sm text-slate-500">Click "New question" to generate an AI-grounded practice question.</div>}
       </div>
 
+      {/* Orchestrator */}
+      <OrchestratorPanel
+        view={view}
+        orchRequest={orchRequest}
+        onOrchRequestChange={onOrchRequestChange}
+        onRunOrchestrator={onRunOrchestrator}
+        orchLoading={orchLoading}
+        orchResult={orchResult}
+      />
+
       {/* AI Coach */}
       <CoachingExchange view={view} />
+    </div>
+  );
+}
+
+// ─── Orchestrator Panel ───────────────────────────────────────────────────────
+
+const WORKFLOW_META: Record<string, { label: string; icon: typeof Workflow; color: string; bg: string; border: string }> = {
+  "certification-planning": { label: "Certification Planning",  icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" },
+  "readiness-evaluation":   { label: "Readiness Evaluation",    icon: Target,        color: "text-sky-600",    bg: "bg-sky-50",    border: "border-sky-200"    },
+  "struggling-learner":     { label: "Learner Recovery Plan",   icon: TrendingUp,    color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200"  },
+  "manager-request":        { label: "Team Readiness Report",   icon: Radar,         color: "text-emerald-600",bg: "bg-emerald-50",border: "border-emerald-200"},
+  "engagement-check":       { label: "Engagement Check",        icon: Activity,      color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-200" },
+  "general-coaching":       { label: "AI Coaching",             icon: BrainCircuit,  color: "text-rose-600",   bg: "bg-rose-50",   border: "border-rose-200"   },
+  "unknown":                { label: "General Request",          icon: Workflow,      color: "text-slate-600",  bg: "bg-slate-50",  border: "border-slate-200"  },
+};
+
+const SUGGESTED_REQUESTS: Record<"employee" | "manager", string[]> = {
+  employee: [
+    "I want to prepare for AZ-104 certification",
+    "How ready am I for my upcoming exam?",
+    "I'm feeling behind and struggling to stay motivated",
+    "What should I study next to fill my skill gaps?",
+  ],
+  manager: [
+    "Show me my team's certification readiness",
+    "Which employees are at risk of missing their targets?",
+    "Give me a workforce skill gap report",
+  ],
+};
+
+function OrchestratorPanel({
+  view, orchRequest, onOrchRequestChange, onRunOrchestrator, orchLoading, orchResult,
+}: {
+  view: "employee" | "manager";
+  orchRequest: string;
+  onOrchRequestChange: (v: string) => void;
+  onRunOrchestrator: (req: string) => void;
+  orchLoading: boolean;
+  orchResult: OrchestratorResult | null;
+}) {
+  const meta = orchResult ? (WORKFLOW_META[orchResult.workflow] ?? WORKFLOW_META["unknown"]) : null;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600">
+          <Workflow className="h-4 w-4 text-white" />
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-slate-900">CertifyIQ Orchestrator</h2>
+          <p className="text-xs text-slate-500">Coordinates all 8 agents — routes, sequences, and synthesizes responses</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+          <Sparkles className="h-3 w-3" /> Multi-Agent
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Input area */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Your Request</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={orchRequest}
+              onChange={e => onOrchRequestChange(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && onRunOrchestrator(orchRequest)}
+              placeholder={view === "manager"
+                ? "e.g. Show me team readiness and skill gaps…"
+                : "e.g. I want to prepare for AZ-104 certification…"}
+              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+            <button
+              onClick={() => onRunOrchestrator(orchRequest)}
+              disabled={orchLoading || !orchRequest.trim()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {orchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Workflow className="h-4 w-4" />}
+              {orchLoading ? "Running…" : "Run"}
+            </button>
+          </div>
+        </div>
+
+        {/* Suggested requests */}
+        {!orchResult && !orchLoading && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-slate-400">Try one of these:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {SUGGESTED_REQUESTS[view].map(s => (
+                <button
+                  key={s}
+                  onClick={() => { onOrchRequestChange(s); onRunOrchestrator(s); }}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors cursor-pointer"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {orchLoading && (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+              <Loader2 className="h-4 w-4 animate-spin" /> Orchestrator running…
+            </div>
+            <p className="text-xs text-indigo-500">Detecting intent → routing agents → passing context → synthesizing response</p>
+          </div>
+        )}
+
+        {/* Result */}
+        {orchResult && !orchLoading && (
+          <div className="space-y-4">
+            {/* Workflow badge + agents consulted */}
+            {meta && (
+              <div className={cn("flex flex-wrap items-center gap-3 rounded-lg border p-3", meta.border, meta.bg)}>
+                <div className="flex items-center gap-1.5">
+                  <meta.icon className={cn("h-4 w-4", meta.color)} />
+                  <span className={cn("text-xs font-bold", meta.color)}>{orchResult.workflowLabel}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {orchResult.agentsConsulted.map(a => (
+                    <span key={a} className="rounded-full bg-white/80 border border-white/60 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm">
+                      {a}
+                    </span>
+                  ))}
+                </div>
+                <span className="ml-auto text-xs text-slate-400">{(orchResult.durationMs / 1000).toFixed(1)}s</span>
+              </div>
+            )}
+
+            {/* Errors (if any) */}
+            {Object.keys(orchResult.errors).length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <span className="font-semibold">Partial results: </span>
+                {Object.entries(orchResult.errors).map(([a, e]) => `${a}: ${e}`).join(" · ")}
+              </div>
+            )}
+
+            {/* Summary */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Key Findings */}
+              {orchResult.summary.keyFindings?.length > 0 && (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <FileSearch className="h-3.5 w-3.5" /> Key Findings
+                  </p>
+                  <ul className="space-y-1">
+                    {orchResult.summary.keyFindings.map((f, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-700">
+                        <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommended Actions */}
+              {orchResult.summary.recommendedActions?.length > 0 && (
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-500">
+                    <Target className="h-3.5 w-3.5" /> Recommended Actions
+                  </p>
+                  <ul className="space-y-1">
+                    {orchResult.summary.recommendedActions.map((a, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-700">
+                        <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-indigo-400" />{a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Risks / Blockers */}
+              {orchResult.summary.risksOrBlockers?.length > 0 && (
+                <div className="rounded-lg border border-rose-100 bg-rose-50/60 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-rose-500">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Risks / Blockers
+                  </p>
+                  <ul className="space-y-1">
+                    {orchResult.summary.risksOrBlockers.map((r, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-slate-700">
+                        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-rose-400" />{r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Next Best Step */}
+              {orchResult.summary.nextBestStep && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-600">
+                    <ArrowUpRight className="h-3.5 w-3.5" /> Next Best Step
+                  </p>
+                  <p className="text-xs font-medium text-slate-800">{orchResult.summary.nextBestStep}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Conflict notes */}
+            {orchResult.summary.conflictNotes && (
+              <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span className="font-semibold">Conflict resolution: </span>{orchResult.summary.conflictNotes}
+              </div>
+            )}
+
+            {/* Re-run button */}
+            <button
+              onClick={() => onRunOrchestrator(orchRequest)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Re-run orchestrator
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1839,6 +2078,9 @@ export default function Home() {
   const [assessmentLoading, setAssessmentLoading] = useState(false);
   const [managerInsights, setManagerInsights] = useState<ManagerInsightsResult | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [orchResult, setOrchResult] = useState<OrchestratorResult | null>(null);
+  const [orchLoading, setOrchLoading] = useState(false);
+  const [orchRequest, setOrchRequest] = useState("");
 
   const setAgent = useCallback((name: string, status: AgentStatus) =>
     setAgentStatuses(s => ({ ...s, [name]: status })), []);
@@ -1891,6 +2133,52 @@ export default function Home() {
     } catch { setAgent("Assessment Agent", "error"); } finally { setAssessmentLoading(false); }
   }, [assessmentLoading, setAgent]);
 
+  const runOrchestrator = useCallback(async (userRequest: string) => {
+    if (orchLoading || !userRequest.trim()) return;
+    setOrchLoading(true); setOrchResult(null);
+    setAgent("Orchestrator", "processing");
+    try {
+      const data: OrchestratorResult = await fetch("/api/orchestrator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userRequest,
+          view,
+          user: {
+            id: "alex-johnson",
+            name: "Alex Johnson",
+            role: "Cloud Operations Engineer",
+            targetCertification: "AZ-104 Azure Administrator",
+            skillsInventory: "Azure basics, networking, storage, identity management",
+            experienceLevel: "Intermediate",
+            completionPercentage: 72,
+            streakDays: 14,
+            assessmentScores: [78, 82, 85],
+            targetDate: "2025-09-01",
+          },
+          team: {
+            teamName: "All Teams",
+            teamSize: 24,
+            readinessScore: 76,
+            certificationCoverage: 94,
+            teams: [
+              { name: "Cloud Ops", readiness: 88 },
+              { name: "Customer Success", readiness: 71 },
+              { name: "Security Analysts", readiness: 93 },
+              { name: "Field Engineering", readiness: 58 },
+            ],
+          },
+        }),
+      }).then(r => r.json());
+      setOrchResult(data);
+      setAgent("Orchestrator", "done");
+    } catch {
+      setAgent("Orchestrator", "error");
+    } finally {
+      setOrchLoading(false);
+    }
+  }, [orchLoading, view, setAgent]);
+
   // Pages that show the right panel
   const showRightPanel = currentPage === "dashboard" || currentPage === "ai-studio";
 
@@ -1911,6 +2199,9 @@ export default function Home() {
                 managerInsights={managerInsights} insightsLoadingProp={insightsLoading}
                 onRunChain={runEmployeeChain} onRunInsights={runManagerInsights}
                 onGenerateAssessment={generateAssessment}
+                orchResult={orchResult} orchLoading={orchLoading}
+                orchRequest={orchRequest} onOrchRequestChange={setOrchRequest}
+                onRunOrchestrator={runOrchestrator}
               />
             )}
             {currentPage === "learners" && <LearnersPage />}
