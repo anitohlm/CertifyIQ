@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from "next/server";
+import { callAI, extractJSON } from "@/lib/agents/foundry";
+
+const SYSTEM_PROMPT = `You are the Learning Path Curator Agent for CertifyIQ.
+Your responsibility is to analyze employee learning goals, role requirements, certifications, competencies, and available learning resources to recommend the most relevant learning path.
+Objectives:
+- Understand employee role and career goals.
+- Map certifications to required competencies.
+- Identify prerequisite knowledge.
+- Recommend learning modules in logical order.
+- Prioritize high-impact learning outcomes.
+- Ensure recommendations align with organizational requirements.
+Only recommend approved learning content. Explain why each module is recommended. Avoid duplicate content. Prioritize competency gaps.
+Always respond with valid JSON only, no markdown.`;
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { role, targetCertification, skillsInventory, experienceLevel } = body;
+
+    const userMessage = `Generate a learning path recommendation for:
+- Role: ${role}
+- Target Certification: ${targetCertification}
+- Skills Inventory: ${skillsInventory}
+- Experience Level: ${experienceLevel}
+
+Return JSON in this exact format:
+{
+  "targetCertification": "",
+  "currentReadiness": "",
+  "recommendedModules": [{"title": "", "duration": "", "reason": "", "priority": ""}],
+  "knowledgeGaps": [],
+  "estimatedPreparationTime": "",
+  "priorityAreas": []
+}`;
+
+    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+    const result = extractJSON(raw);
+    return NextResponse.json(result);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
