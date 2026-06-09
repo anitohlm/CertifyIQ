@@ -1,133 +1,60 @@
-// ─── Base URLs ───────────────────────────────────────────────────────────────
+/**
+ * Azure AI Foundry — Chat Completions + Named Agents
+ *
+ * Agents are called via the OpenAI Responses API using the agent's ID,
+ * NOT via the threads/runs REST API (which has version compatibility issues).
+ *
+ * Pattern (same as Linkedout project):
+ *   const client = new AzureOpenAI({ endpoint: projectEndpoint, apiKey, apiVersion })
+ *   client.responses.create({ input: [...], extra_body: { agent_id } })
+ */
+import { AzureOpenAI } from "openai";
 
-/** Full project endpoint, e.g. https://xxx.services.ai.azure.com/api/projects/CertifyIQ */
-const projectEndpoint = () =>
-  process.env.AZURE_FOUNDRY_ENDPOINT!.replace(/\/$/, "");
-
-/** Root of the Azure AI Foundry service, e.g. https://xxx.services.ai.azure.com */
-const getServiceRoot = () =>
-  projectEndpoint()
-    .replace(/\/api\/projects\/[^/]+$/, "")
-    .replace(/\/$/, "");
-
-const AGENTS_API_VERSION = "2025-05-01-preview";
-
-/** Base URL for the Agents REST API (scoped to the project) */
-const agentsBase = () => `${projectEndpoint()}/agents/v1.0`;
-
-/** Base URL for chat-completions (inference) */
-const inferenceBase = () => `${getServiceRoot()}/models`;
-
-const KEY = () => process.env.AZURE_FOUNDRY_API_KEY!;
-const MODEL = () => process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4.1-mini";
-
-// ─── Agents API (thread / run / poll) ────────────────────────────────────────
-
-type RunStatus =
-  | "queued"
-  | "in_progress"
-  | "requires_action"
-  | "cancelling"
-  | "cancelled"
-  | "failed"
-  | "completed"
-  | "expired";
-
-interface AgentRun {
-  id: string;
-  status: RunStatus;
-  last_error?: { code: string; message: string };
+function getProjectEndpoint() {
+  return process.env.AZURE_FOUNDRY_ENDPOINT!.replace(/\/$/, "");
 }
 
-interface ThreadMessage {
-  role: "user" | "assistant";
-  content: Array<{ type: string; text?: { value: string } }>;
+function getInferenceEndpoint() {
+  const base = process.env.AZURE_FOUNDRY_ENDPOINT!;
+  const resource = base.split("/api/projects")[0];
+  return `${resource}/models`;
 }
 
-async function agentFetch(path: string, options?: RequestInit) {
-  const sep = path.includes("?") ? "&" : "?";
-  const url = `${agentsBase()}${path}${sep}api-version=${AGENTS_API_VERSION}`;
-  console.log(`[Agents API] ${options?.method ?? "GET"} ${url}`);
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "api-key": KEY(),
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
+function getOpenAIClient() {
+  return new AzureOpenAI({
+    endpoint: getProjectEndpoint(),
+    apiKey: process.env.AZURE_FOUNDRY_API_KEY!,
+    apiVersion: "2025-04-01-preview",
   });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`[Agents API] ${res.status} at ${url}:`, text);
-    throw new Error(`Agents API ${res.status} at ${url}: ${text}`);
-  }
-  return res.json();
 }
+
+const MODEL = () => process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4.1-mini";
+const KEY = () => process.env.AZURE_FOUNDRY_API_KEY!;
 
 /**
- * Call an Azure AI Foundry Agent by ID.
- * Creates a thread, posts the user message, starts a run, polls until done,
- * and returns the assistant's reply as a string.
+ * Call an Azure AI Foundry Agent by ID via the Responses API.
  */
 export async function callAgent(
   agentId: string,
-  userMessage: string,
-  maxWaitMs = 60_000
+  userMessage: string
 ): Promise<string> {
-  // 1. Create thread
-  const thread = await agentFetch("/threads", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-  const threadId: string = thread.id;
+  const client = getOpenAIClient();
 
-  // 2. Post user message
-  await agentFetch(`/threads/${threadId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ role: "user", content: userMessage }),
+  const response = await (client.responses as any).create({
+    input: [{ role: "user", content: userMessage }],
+    extra_body: { agent_id: agentId },
   });
 
-  // 3. Start run
-  const run: AgentRun = await agentFetch(`/threads/${threadId}/runs`, {
-    method: "POST",
-    body: JSON.stringify({ assistant_id: agentId }),
-  });
+  const text: string =
+    response.output_text ??
+    response.output?.[0]?.content?.[0]?.text ??
+    "";
 
-  // 4. Poll until terminal state
-  const terminalStates: RunStatus[] = ["completed", "failed", "cancelled", "expired"];
-  const pollInterval = 1_500;
-  const deadline = Date.now() + maxWaitMs;
-  let currentRun = run;
-
-  while (!terminalStates.includes(currentRun.status)) {
-    if (Date.now() > deadline) throw new Error("Agent run timed out");
-    await new Promise((r) => setTimeout(r, pollInterval));
-    currentRun = await agentFetch(`/threads/${threadId}/runs/${run.id}`);
-  }
-
-  if (currentRun.status !== "completed") {
-    throw new Error(
-      `Agent run ${currentRun.status}: ${currentRun.last_error?.message ?? "unknown error"}`
-    );
-  }
-
-  // 5. Fetch messages and return the latest assistant reply
-  const msgs: { data: ThreadMessage[] } = await agentFetch(
-    `/threads/${threadId}/messages`
-  );
-
-  const assistantMsg = msgs.data
-    .filter((m) => m.role === "assistant")
-    .flatMap((m) => m.content)
-    .filter((c) => c.type === "text" && c.text?.value)
-    .map((c) => c.text!.value)
-    .join("\n");
-
-  if (!assistantMsg) throw new Error("Agent returned no text content");
-  return assistantMsg;
+  if (!text) throw new Error("Agent returned no text content");
+  return text;
 }
 
-// ─── Chat Completions (fallback for agents without IDs yet) ──────────────────
+// ─── Chat Completions (fallback for routes without an agent ID) ───────────────
 
 export async function callAI(
   systemPrompt: string,
@@ -135,7 +62,7 @@ export async function callAI(
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [],
   maxTokens = 2000
 ): Promise<string> {
-  const url = `${inferenceBase()}/chat/completions`;
+  const url = `${getInferenceEndpoint()}/chat/completions`;
 
   const messages = [
     { role: "system", content: systemPrompt },
