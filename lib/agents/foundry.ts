@@ -1,13 +1,19 @@
 // ─── Base URLs ───────────────────────────────────────────────────────────────
 
+/** Full project endpoint, e.g. https://xxx.services.ai.azure.com/api/projects/CertifyIQ */
+const projectEndpoint = () =>
+  process.env.AZURE_FOUNDRY_ENDPOINT!.replace(/\/$/, "");
+
 /** Root of the Azure AI Foundry service, e.g. https://xxx.services.ai.azure.com */
 const getServiceRoot = () =>
-  process.env.AZURE_FOUNDRY_ENDPOINT!
-    .replace(/\/api\/projects\/[^/]+\/?$/, "")
+  projectEndpoint()
+    .replace(/\/api\/projects\/[^/]+$/, "")
     .replace(/\/$/, "");
 
-/** Base URL for the Agents REST API */
-const agentsBase = () => `${getServiceRoot()}/agents/v1.0`;
+const AGENTS_API_VERSION = "2025-05-01-preview";
+
+/** Base URL for the Agents REST API (scoped to the project) */
+const agentsBase = () => `${projectEndpoint()}/agents/v1.0`;
 
 /** Base URL for chat-completions (inference) */
 const inferenceBase = () => `${getServiceRoot()}/models`;
@@ -39,7 +45,9 @@ interface ThreadMessage {
 }
 
 async function agentFetch(path: string, options?: RequestInit) {
-  const url = `${agentsBase()}${path}`;
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `${agentsBase()}${path}${sep}api-version=${AGENTS_API_VERSION}`;
+  console.log(`[Agents API] ${options?.method ?? "GET"} ${url}`);
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -50,7 +58,8 @@ async function agentFetch(path: string, options?: RequestInit) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Agents API ${res.status} at ${path}: ${text}`);
+    console.error(`[Agents API] ${res.status} at ${url}:`, text);
+    throw new Error(`Agents API ${res.status} at ${url}: ${text}`);
   }
   return res.json();
 }
