@@ -1316,7 +1316,7 @@ function DashboardPage({ view, onNavigate }: { view: "employee" | "manager"; onN
   return (
     <div className="space-y-5">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white">
+      <div className={cn("relative overflow-hidden rounded-2xl p-6 text-white transition-all duration-500", THEME[view].heroBg)}>
         <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-6 right-24 h-24 w-24 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute right-10 top-8 text-6xl opacity-70 select-none">📚</div>
@@ -1613,36 +1613,86 @@ function AIStudioPage({
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
+// Theme tokens — swap everything by changing one variable
+const THEME = {
+  employee: {
+    // Sidebar
+    sidebarBg:       "bg-white",
+    sidebarBorder:   "border-slate-200",
+    logoBg:          "bg-indigo-700",
+    tabActive:       "bg-indigo-700 text-white",
+    tabInactive:     "bg-white text-slate-500 hover:bg-indigo-50 hover:text-indigo-700",
+    tabBorder:       "border-slate-200",
+    labelColor:      "text-indigo-400",
+    navActive:       "bg-indigo-50 text-indigo-700",
+    navInactive:     "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+    upgradeBg:       "bg-indigo-700",
+    upgradeText:     "text-indigo-100",
+    upgradeSparkle:  "text-indigo-200",
+    upgradeBtnText:  "text-indigo-700 hover:bg-indigo-50",
+    // Header
+    headerBorder:    "border-indigo-100",
+    headerAccent:    "bg-indigo-600",
+    // Dashboard hero
+    heroBg:          "bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600",
+    // Main bg tint
+    mainBg:          "bg-slate-50",
+    // Page accent
+    pageAccent:      "text-indigo-600",
+    btnPrimary:      "bg-indigo-700 hover:bg-indigo-600 text-white",
+  },
+  manager: {
+    sidebarBg:       "bg-slate-900",
+    sidebarBorder:   "border-slate-700",
+    logoBg:          "bg-emerald-600",
+    tabActive:       "bg-emerald-600 text-white",
+    tabInactive:     "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-emerald-300",
+    tabBorder:       "border-slate-700",
+    labelColor:      "text-emerald-500",
+    navActive:       "bg-emerald-900/60 text-emerald-300",
+    navInactive:     "text-slate-400 hover:bg-slate-800 hover:text-slate-100",
+    upgradeBg:       "bg-emerald-700",
+    upgradeText:     "text-emerald-100",
+    upgradeSparkle:  "text-emerald-200",
+    upgradeBtnText:  "text-emerald-700 hover:bg-emerald-50",
+    headerBorder:    "border-emerald-200",
+    headerAccent:    "bg-emerald-600",
+    heroBg:          "bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-700",
+    mainBg:          "bg-slate-50",
+    pageAccent:      "text-emerald-700",
+    btnPrimary:      "bg-emerald-700 hover:bg-emerald-600 text-white",
+  },
+};
+
 function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage: Page; onPage: (p: Page) => void; view: "employee" | "manager"; onView: (v: "employee" | "manager") => void; onUpgrade: () => void }) {
   const nav = view === "employee" ? learnerNav : managerNav;
+  const t = THEME[view];
 
   const handleViewSwitch = (v: "employee" | "manager") => {
     onView(v);
-    // redirect to dashboard if current page isn't in the new nav
     const newNav = v === "employee" ? learnerNav : managerNav;
     if (!newNav.find(n => n.page === currentPage)) onPage("dashboard");
   };
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className={cn("flex h-screen w-56 shrink-0 flex-col border-r transition-colors duration-300", t.sidebarBg, t.sidebarBorder)}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-700 text-white">
+        <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg text-white transition-colors duration-300", t.logoBg)}>
           <BrainCircuit className="h-4 w-4" />
         </div>
-        <span className="text-base font-bold text-slate-900">CertifyIQ</span>
+        <span className={cn("text-base font-bold transition-colors duration-300", view === "manager" ? "text-white" : "text-slate-900")}>CertifyIQ</span>
       </div>
 
       {/* Learner / Manager tabs */}
       <div className="px-4 mb-2">
-        <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+        <div className={cn("flex rounded-xl border overflow-hidden text-xs font-semibold transition-colors duration-300", t.tabBorder)}>
           <button
             onClick={() => handleViewSwitch("employee")}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors",
-              view === "employee"
-                ? "bg-indigo-700 text-white"
-                : "bg-white text-slate-500 hover:bg-slate-50"
+              "flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors duration-200 cursor-pointer",
+              view === "employee" ? THEME.employee.tabActive : THEME.employee.tabInactive,
+              view === "manager" && "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-emerald-300"
             )}
           >
             <GraduationCap className="h-4 w-4" />
@@ -1651,10 +1701,9 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
           <button
             onClick={() => handleViewSwitch("manager")}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 border-l border-slate-200 py-2.5 transition-colors",
-              view === "manager"
-                ? "bg-indigo-700 text-white border-indigo-700"
-                : "bg-white text-slate-500 hover:bg-slate-50"
+              "flex flex-1 flex-col items-center gap-0.5 border-l py-2.5 transition-colors duration-200 cursor-pointer",
+              t.tabBorder,
+              view === "manager" ? THEME.manager.tabActive : "bg-white text-slate-500 hover:bg-slate-50 hover:text-indigo-700"
             )}
           >
             <BriefcaseBusiness className="h-4 w-4" />
@@ -1663,8 +1712,8 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
         </div>
       </div>
 
-      {/* Nav label */}
-      <p className="px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+      {/* Nav section label */}
+      <p className={cn("px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-widest transition-colors duration-300", t.labelColor)}>
         {view === "employee" ? "Learner Menu" : "Manager Menu"}
       </p>
 
@@ -1673,10 +1722,8 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
         {nav.map(({ icon: Icon, label, page }) => (
           <button key={page} onClick={() => onPage(page)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-              currentPage === page
-                ? "bg-indigo-50 text-indigo-700"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 cursor-pointer",
+              currentPage === page ? t.navActive : t.navInactive
             )}>
             <Icon className="h-4 w-4 shrink-0" />
             {label}
@@ -1685,16 +1732,16 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
       </nav>
 
       {/* Upgrade card */}
-      <div className="m-4 rounded-xl bg-indigo-700 p-4 text-white">
-        <Sparkles className="h-5 w-5 text-indigo-200" />
-        <p className="mt-2 text-xs font-semibold leading-5 text-indigo-100">Upgrade to Pro for AI coaching, full analytics, and team insights.</p>
-        <button onClick={onUpgrade} className="mt-3 w-full rounded-lg bg-white py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 cursor-pointer">Upgrade →</button>
+      <div className={cn("m-4 rounded-xl p-4 text-white transition-colors duration-300", t.upgradeBg)}>
+        <Sparkles className={cn("h-5 w-5", t.upgradeSparkle)} />
+        <p className={cn("mt-2 text-xs font-semibold leading-5", t.upgradeText)}>Upgrade to Pro for AI coaching, full analytics, and team insights.</p>
+        <button onClick={onUpgrade} className={cn("mt-3 w-full rounded-lg bg-white py-1.5 text-xs font-bold cursor-pointer transition-colors", t.upgradeBtnText)}>Upgrade →</button>
       </div>
     </aside>
   );
 }
 
-function TopHeader({ currentPage, onNavigate }: { currentPage: Page; onNavigate: (p: Page) => void }) {
+function TopHeader({ currentPage, onNavigate, view }: { currentPage: Page; onNavigate: (p: Page) => void; view: "employee" | "manager" }) {
   const [search, setSearch] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -1722,7 +1769,9 @@ function TopHeader({ currentPage, onNavigate }: { currentPage: Page; onNavigate:
     }
   };
   return (
-    <header className={cn("flex h-14 items-center gap-4 border-b px-6 backdrop-blur-sm transition-colors", darkMode ? "border-slate-700 bg-slate-900/90" : "border-slate-200 bg-white/80")}>
+    <header className={cn("relative flex h-14 items-center gap-4 border-b px-6 backdrop-blur-sm transition-colors", darkMode ? "border-slate-700 bg-slate-900/90" : view === "manager" ? "border-emerald-100 bg-white/80" : "border-slate-200 bg-white/80")}>
+      {/* Coloured accent line at top of header */}
+      <span className={cn("pointer-events-none absolute left-0 top-0 h-0.5 w-full transition-colors duration-300", view === "manager" ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" : "bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500")} />
       <div className={cn("flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-sm", darkMode ? "border-slate-700 bg-slate-800 text-slate-300" : "border-slate-200 bg-slate-50 text-slate-400")}>
         <Search className="h-4 w-4 shrink-0" />
         <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleSearch} placeholder="Search courses, learners, certifications…" className={cn("flex-1 bg-transparent outline-none placeholder:text-slate-400", darkMode ? "text-slate-200" : "text-slate-700")} />
@@ -1850,7 +1899,7 @@ export default function Home() {
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       <Sidebar currentPage={currentPage} onPage={setCurrentPage} view={view} onView={setView} onUpgrade={() => setShowUpgrade(true)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader currentPage={currentPage} onNavigate={setCurrentPage} />
+        <TopHeader currentPage={currentPage} onNavigate={setCurrentPage} view={view} />
         <main className={cn("flex flex-1 gap-5 overflow-y-auto p-5", !showRightPanel && "")}>
           <div className="flex-1 min-w-0">
             {currentPage === "dashboard" && <DashboardPage view={view} onNavigate={setCurrentPage} />}

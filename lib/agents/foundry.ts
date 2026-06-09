@@ -20,9 +20,16 @@ function getInferenceEndpoint() {
   return `${resource}/models`;
 }
 
+function getServiceRoot() {
+  return process.env.AZURE_FOUNDRY_ENDPOINT!
+    .split("/api/projects")[0]
+    .replace(/\/$/, "");
+}
+
 function getOpenAIClient() {
+  // Use service root (not project endpoint) so SDK hits /openai/responses correctly
   return new AzureOpenAI({
-    endpoint: getProjectEndpoint(),
+    endpoint: getServiceRoot(),
     apiKey: process.env.AZURE_FOUNDRY_API_KEY!,
     apiVersion: "2025-04-01-preview",
   });
@@ -40,18 +47,25 @@ export async function callAgent(
 ): Promise<string> {
   const client = getOpenAIClient();
 
-  const response = await (client.responses as any).create({
-    input: [{ role: "user", content: userMessage }],
-    extra_body: { agent_id: agentId },
-  });
+  try {
+    const response = await (client.responses as any).create({
+      model: agentId,
+      input: [{ role: "user", content: userMessage }],
+    });
 
-  const text: string =
-    response.output_text ??
-    response.output?.[0]?.content?.[0]?.text ??
-    "";
+    console.log("[callAgent] raw response keys:", Object.keys(response));
 
-  if (!text) throw new Error("Agent returned no text content");
-  return text;
+    const text: string =
+      response.output_text ??
+      response.output?.[0]?.content?.[0]?.text ??
+      "";
+
+    if (!text) throw new Error("Agent returned no text content");
+    return text;
+  } catch (err: any) {
+    console.error("[callAgent] ERROR:", err?.status, err?.message, JSON.stringify(err?.error ?? err));
+    throw err;
+  }
 }
 
 // ─── Chat Completions (fallback for routes without an agent ID) ───────────────
