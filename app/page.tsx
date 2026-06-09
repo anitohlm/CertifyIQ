@@ -214,16 +214,26 @@ function StatusBadge({ status }: { status: string }) {
 function LearnersPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [profile, setProfile] = useState<typeof learnersData[0] | null>(null);
+  const [toast, setToast] = useState("");
   const filters = ["All", "On Track", "At Risk", "Medium", "Completed"];
   const filtered = learnersData.filter(l =>
     (filter === "All" || l.status === filter) &&
     (l.name.toLowerCase().includes(search.toLowerCase()) || l.role.toLowerCase().includes(search.toLowerCase()))
   );
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   return (
     <div className="space-y-5">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl animate-in slide-in-from-bottom-4">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+        </div>
+      )}
+
       <PageHeader title="Learners" subtitle="Track certification progress across your workforce." action={
-        <button className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+        <button onClick={() => showToast("Invite link copied to clipboard!")} className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 transition-colors cursor-pointer">
           <UsersRound className="h-4 w-4" /> Invite learner
         </button>
       } />
@@ -253,7 +263,7 @@ function LearnersPage() {
           </div>
           <div className="flex gap-1">
             {filters.map(f => (
-              <button key={f} onClick={() => setFilter(f)} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:bg-slate-100")}>{f}</button>
+              <button key={f} onClick={() => setFilter(f)} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:bg-slate-100")}>{f}</button>
             ))}
           </div>
         </div>
@@ -261,24 +271,54 @@ function LearnersPage() {
           <span>Learner</span><span>Certification</span><span>Readiness</span><span>Progress</span><span>Streak</span><span />
         </div>
         {filtered.map(l => (
-          <div key={l.name} className="grid grid-cols-[2fr_1.5fr_1fr_1.2fr_0.8fr_auto] items-center border-t border-slate-100 px-5 py-3.5">
-            <div className="flex items-center gap-3">
-              <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", l.color)}>{l.avatar}</div>
-              <div>
-                <div className="text-sm font-semibold text-slate-900">{l.name}</div>
-                <div className="text-xs text-slate-500">{l.role}</div>
+          <div key={l.name}>
+            <div className={cn("grid grid-cols-[2fr_1.5fr_1fr_1.2fr_0.8fr_auto] items-center border-t border-slate-100 px-5 py-3.5 transition-colors", profile?.name === l.name ? "bg-indigo-50/60" : "hover:bg-slate-50/60")}>
+              <div className="flex items-center gap-3">
+                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", l.color)}>{l.avatar}</div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{l.name}</div>
+                  <div className="text-xs text-slate-500">{l.role}</div>
+                </div>
               </div>
+              <div className="text-sm font-medium text-slate-700">{l.cert}</div>
+              <StatusBadge status={l.status} />
+              <div className="pr-4">
+                <div className="text-xs font-semibold text-slate-600">{l.readiness}%</div>
+                <Progress value={l.readiness} className="mt-1 h-1.5" indicatorClassName={l.readiness >= 80 ? "bg-emerald-500" : l.readiness >= 60 ? "bg-amber-500" : "bg-rose-500"} />
+              </div>
+              <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+                <Award className="h-3.5 w-3.5 text-amber-500" />{l.streak}d
+              </div>
+              <button onClick={() => setProfile(p => p?.name === l.name ? null : l)} className={cn("rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer", profile?.name === l.name ? "border-indigo-300 bg-indigo-100 text-indigo-700" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>
+                {profile?.name === l.name ? "Close" : "View"}
+              </button>
             </div>
-            <div className="text-sm font-medium text-slate-700">{l.cert}</div>
-            <StatusBadge status={l.status} />
-            <div className="pr-4">
-              <div className="text-xs font-semibold text-slate-600">{l.readiness}%</div>
-              <Progress value={l.readiness} className="mt-1 h-1.5" indicatorClassName={l.readiness >= 80 ? "bg-emerald-500" : l.readiness >= 60 ? "bg-amber-500" : "bg-rose-500"} />
-            </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-              <Award className="h-3.5 w-3.5 text-amber-500" />{l.streak}d
-            </div>
-            <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">View</button>
+            {/* Inline learner profile */}
+            {profile?.name === l.name && (
+              <div className="border-t border-indigo-100 bg-indigo-50/40 px-5 py-4 grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Certification Progress</p>
+                  <div className="text-sm font-semibold text-slate-900">{l.cert}</div>
+                  <Progress value={l.readiness} className="mt-2 h-2" indicatorClassName={l.readiness >= 80 ? "bg-emerald-500" : l.readiness >= 60 ? "bg-amber-500" : "bg-rose-500"} />
+                  <div className="mt-1 flex justify-between text-xs text-slate-500"><span>{l.readiness}% ready</span><StatusBadge status={l.status} /></div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Activity</p>
+                  <div className="space-y-1.5 text-xs text-slate-600">
+                    <div className="flex items-center gap-2"><Award className="h-3.5 w-3.5 text-amber-500" />{l.streak}-day study streak</div>
+                    <div className="flex items-center gap-2"><Target className="h-3.5 w-3.5 text-indigo-500" />Plan adherence: 88%</div>
+                    <div className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-sky-500" />Last active: Today</div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Quick Actions</p>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => showToast(`Nudge sent to ${l.name}`)} className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 text-left cursor-pointer">Send study nudge</button>
+                    <button onClick={() => showToast(`Path reassigned for ${l.name}`)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 text-left cursor-pointer">Reassign path</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -287,46 +327,88 @@ function LearnersPage() {
 }
 
 function ManagersPage() {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState("");
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const teamMembers: Record<string, { name: string; cert: string; readiness: number }[]> = {
+    "Robin Torres": [{ name: "Alex Johnson", cert: "AZ-104", readiness: 82 }, { name: "Sarah Chen", cert: "AZ-104", readiness: 89 }, { name: "Morgan Chen", cert: "AZ-400", readiness: 71 }],
+    "Dana Smith":   [{ name: "Casey Lee", cert: "AZ-305", readiness: 58 }, { name: "Sam Rivera", cert: "DP-300", readiness: 45 }],
+    "Jordan Lee":   [{ name: "Taylor Kim", cert: "SC-200", readiness: 93 }, { name: "Jordan Park", cert: "SC-900", readiness: 67 }],
+    "Quinn Patel":  [{ name: "Marcos Lima", cert: "AZ-400", readiness: 32 }],
+  };
+
   return (
     <div className="space-y-5">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+        </div>
+      )}
       <PageHeader title="Managers" subtitle="Team leads and their workforce readiness overview." action={
-        <button className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+        <button onClick={() => showToast("Manager invite sent!")} className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 transition-colors cursor-pointer">
           <BriefcaseBusiness className="h-4 w-4" /> Add manager
         </button>
       } />
 
       <div className="grid grid-cols-2 gap-4">
         {managersData.map(m => (
-          <div key={m.name} className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn("flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white", m.color)}>{m.avatar}</div>
-                <div>
-                  <div className="font-semibold text-slate-900">{m.name}</div>
-                  <div className="text-xs text-slate-500">{m.team} · {m.size} direct reports</div>
+          <div key={m.name} className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white", m.color)}>{m.avatar}</div>
+                  <div>
+                    <div className="font-semibold text-slate-900">{m.name}</div>
+                    <div className="text-xs text-slate-500">{m.team} · {m.size} direct reports</div>
+                  </div>
+                </div>
+                <StatusBadge status={m.risk} />
+              </div>
+              <div className="mt-4">
+                <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                  <span>Team readiness</span><span>{m.readiness}%</span>
+                </div>
+                <Progress value={m.readiness} className="h-2" indicatorClassName={m.readiness >= 85 ? "bg-emerald-500" : m.readiness >= 70 ? "bg-amber-500" : "bg-rose-500"} />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                {[
+                  { label: "On track", value: m.readiness >= 80 ? Math.floor(m.size * 0.7) : Math.floor(m.size * 0.4) },
+                  { label: "At risk", value: m.risk === "High" ? Math.floor(m.size * 0.4) : 1 },
+                  { label: "Completed", value: m.risk === "Low" ? 2 : 0 },
+                ].map(s => (
+                  <div key={s.label} className="rounded-lg bg-slate-50 py-2">
+                    <div className="text-lg font-bold text-slate-900">{s.value}</div>
+                    <div className="text-xs text-slate-500">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setExpanded(prev => { const n = new Set(prev); n.has(m.name) ? n.delete(m.name) : n.add(m.name); return n; })}
+                className="mt-4 w-full rounded-lg border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
+              >
+                {expanded.has(m.name) ? <><ChevronUp className="h-3.5 w-3.5" /> Hide team</> : <><ChevronDown className="h-3.5 w-3.5" /> View team details</>}
+              </button>
+            </div>
+            {expanded.has(m.name) && (
+              <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Team members</p>
+                <div className="space-y-2">
+                  {(teamMembers[m.name] ?? []).map(member => (
+                    <div key={member.name} className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800">{member.name}</p>
+                        <p className="text-xs text-slate-400">{member.cert}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-xs font-bold", member.readiness >= 80 ? "text-emerald-600" : member.readiness >= 60 ? "text-amber-600" : "text-rose-600")}>{member.readiness}%</span>
+                        <button onClick={() => showToast(`Nudge sent to ${member.name}`)} className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 cursor-pointer">Nudge</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <StatusBadge status={m.risk} />
-            </div>
-            <div className="mt-4">
-              <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1">
-                <span>Team readiness</span><span>{m.readiness}%</span>
-              </div>
-              <Progress value={m.readiness} className="h-2" indicatorClassName={m.readiness >= 85 ? "bg-emerald-500" : m.readiness >= 70 ? "bg-amber-500" : "bg-rose-500"} />
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              {[
-                { label: "On track", value: m.readiness >= 80 ? Math.floor(m.size * 0.7) : Math.floor(m.size * 0.4) },
-                { label: "At risk", value: m.risk === "High" ? Math.floor(m.size * 0.4) : 1 },
-                { label: "Completed", value: m.risk === "Low" ? 2 : 0 },
-              ].map(s => (
-                <div key={s.label} className="rounded-lg bg-slate-50 py-2">
-                  <div className="text-lg font-bold text-slate-900">{s.value}</div>
-                  <div className="text-xs text-slate-500">{s.label}</div>
-                </div>
-              ))}
-            </div>
-            <button className="mt-4 w-full rounded-lg border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">View team details</button>
+            )}
           </div>
         ))}
       </div>
@@ -336,61 +418,109 @@ function ManagersPage() {
 
 function CertificationsPage() {
   const [filter, setFilter] = useState("All");
+  const [enrolled, setEnrolled] = useState<Set<string>>(new Set(["AZ-104"]));
+  const [toast, setToast] = useState("");
   const categories = ["All", "Azure", "Security", "Data", "DevOps"];
   const filtered = allCerts.filter(c => filter === "All" || c.category === filter);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const handleEnroll = (code: string, title: string) => {
+    if (enrolled.has(code)) return;
+    setEnrolled(prev => new Set([...prev, code]));
+    showToast(`Enrolled in ${title}! Check your active paths.`);
+  };
 
   return (
     <div className="space-y-5">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+        </div>
+      )}
       <PageHeader title="Certifications" subtitle="Browse and enroll in certification programs." action={
         <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
           {categories.map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:text-slate-700")}>
+            <button key={f} onClick={() => setFilter(f)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:text-slate-700")}>
               {f}
             </button>
           ))}
         </div>
       } />
       <div className="grid grid-cols-4 gap-4">
-        {filtered.map(cert => (
-          <div key={cert.code} className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm transition-shadow hover:shadow-md">
-            <div className={cn("flex h-28 items-center justify-center bg-gradient-to-br text-5xl", cert.gradient)}>
-              <span>{cert.icon}</span>
-            </div>
-            <div className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-sm font-bold text-slate-900">{cert.title}</div>
-                  <div className="text-xs text-slate-500">{cert.code}</div>
+        {filtered.map(cert => {
+          const isEnrolled = enrolled.has(cert.code);
+          const isCompleted = cert.status === "Completed";
+          return (
+            <div key={cert.code} className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm transition-shadow hover:shadow-md">
+              <div className={cn("flex h-28 items-center justify-center bg-gradient-to-br text-5xl", cert.gradient)}>
+                <span>{cert.icon}</span>
+              </div>
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{cert.title}</div>
+                    <div className="text-xs text-slate-500">{cert.code}</div>
+                  </div>
+                  <StatusBadge status={isCompleted ? "Completed" : isEnrolled ? "In Progress" : "Available"} />
                 </div>
-                <StatusBadge status={cert.status} />
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{cert.level}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{cert.duration}</span>
+                </div>
+                <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                  <UsersRound className="h-3 w-3" />{cert.enrolled + (isEnrolled && cert.status !== "In Progress" ? 1 : 0)} enrolled
+                </div>
+                <button
+                  onClick={() => !isCompleted && handleEnroll(cert.code, cert.title)}
+                  className={cn("mt-3 w-full rounded-lg py-2 text-xs font-semibold transition-colors cursor-pointer",
+                    isCompleted ? "bg-slate-100 text-slate-500 cursor-default" :
+                    isEnrolled ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" :
+                    "bg-indigo-700 text-white hover:bg-indigo-600"
+                  )}
+                >
+                  {isCompleted ? "✓ Completed" : isEnrolled ? "Continue →" : "Enroll"}
+                </button>
               </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium">{cert.level}</span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{cert.duration}</span>
-              </div>
-              <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-                <UsersRound className="h-3 w-3" />{cert.enrolled} enrolled
-              </div>
-              <button className={cn("mt-3 w-full rounded-lg py-2 text-xs font-semibold transition-colors",
-                cert.status === "Completed" ? "bg-slate-100 text-slate-500 cursor-default" :
-                cert.status === "In Progress" ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" :
-                "bg-indigo-700 text-white hover:bg-indigo-600"
-              )}>
-                {cert.status === "Completed" ? "✓ Completed" : cert.status === "In Progress" ? "Continue" : "Enroll"}
-              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
 function LiveSessionsPage() {
+  const [registered, setRegistered] = useState<Set<string>>(new Set());
+  const [joining, setJoining] = useState(false);
+  const [toast, setToast] = useState("");
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const toggleRegister = (title: string) => {
+    setRegistered(prev => {
+      const n = new Set(prev);
+      if (n.has(title)) { n.delete(title); showToast(`Unregistered from ${title}`); }
+      else { n.add(title); showToast(`Registered for ${title}! Added to your calendar.`); }
+      return n;
+    });
+  };
+
+  const handleJoin = () => {
+    setJoining(true);
+    showToast("Connecting to session… Opening in new tab.");
+    setTimeout(() => setJoining(false), 2500);
+  };
+
+  const handleSchedule = () => showToast("Session creation form coming soon!");
+
   return (
     <div className="space-y-5">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+        </div>
+      )}
       <PageHeader title="Live Sessions" subtitle="Join scheduled study groups, workshops, and exam prep sessions." action={
-        <button className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+        <button onClick={handleSchedule} className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 transition-colors cursor-pointer">
           <Video className="h-4 w-4" /> Schedule session
         </button>
       } />
@@ -408,37 +538,47 @@ function LiveSessionsPage() {
               <UsersRound className="h-4 w-4" /> 24 / 30 enrolled
             </div>
           </div>
-          <button className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-indigo-700 hover:bg-indigo-50">
-            Join now →
+          <button onClick={handleJoin} disabled={joining} className="flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-70 transition-colors cursor-pointer">
+            {joining ? <><Loader2 className="h-4 w-4 animate-spin" /> Connecting…</> : "Join now →"}
           </button>
         </div>
       </div>
 
       {/* Session list */}
       <div className="space-y-3">
-        {liveSessions.slice(1).map(s => (
-          <div key={s.title} className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-2xl", s.gradient)}>
-              🎯
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-900">{s.title}</span>
-                <StatusBadge status={s.status} />
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{s.type}</span>
+        {liveSessions.slice(1).map(s => {
+          const isRegistered = registered.has(s.title);
+          return (
+            <div key={s.title} className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-2xl", s.gradient)}>
+                🎯
               </div>
-              <div className="mt-1 flex items-center gap-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><User className="h-3 w-3" />{s.instructor}</span>
-                <span className="flex items-center gap-1"><CalendarClock className="h-3 w-3" />{s.date} · {s.time}</span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{s.duration}</span>
-                <span className="flex items-center gap-1"><UsersRound className="h-3 w-3" />{s.enrolled}/{s.max}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-900">{s.title}</span>
+                  <StatusBadge status={s.status} />
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{s.type}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-4 text-xs text-slate-500">
+                  <span className="flex items-center gap-1"><User className="h-3 w-3" />{s.instructor}</span>
+                  <span className="flex items-center gap-1"><CalendarClock className="h-3 w-3" />{s.date} · {s.time}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{s.duration}</span>
+                  <span className="flex items-center gap-1"><UsersRound className="h-3 w-3" />{s.enrolled + (isRegistered ? 1 : 0)}/{s.max}</span>
+                </div>
               </div>
+              <button
+                onClick={() => toggleRegister(s.title)}
+                className={cn("shrink-0 rounded-lg px-4 py-2 text-xs font-semibold transition-colors cursor-pointer",
+                  isRegistered
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                )}
+              >
+                {isRegistered ? <span className="flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Registered</span> : "Register"}
+              </button>
             </div>
-            <button className="shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
-              Register
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -551,7 +691,9 @@ function AssessmentsPage({
             <span className={cn("font-bold", a.score >= 80 ? "text-emerald-600" : a.score >= 65 ? "text-amber-600" : "text-rose-600")}>{a.score}%</span>
             <span className="text-xs text-slate-500">{a.date}</span>
             <StatusBadge status={a.status} />
-            <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Retry</button>
+            <button onClick={() => { setSelected(null); onGenerate(); }} disabled={assessmentLoading} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-40 cursor-pointer">
+              {assessmentLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Retry"}
+            </button>
           </div>
         ))}
       </div>
@@ -560,11 +702,22 @@ function AssessmentsPage({
 }
 
 function AnalyticsPage() {
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState(false);
+  const handleExport = () => {
+    setExporting(true);
+    setTimeout(() => { setExporting(false); setExported(true); setTimeout(() => setExported(false), 2500); }, 1800);
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader title="Analytics" subtitle="Organisation-wide readiness trends and certification intelligence." action={
-        <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-          <Download className="h-4 w-4" /> Export report
+        <button onClick={handleExport} disabled={exporting} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors cursor-pointer",
+          exported ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+          exporting ? "border-slate-200 bg-slate-50 text-slate-400" :
+          "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+        )}>
+          {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> Exporting…</> : exported ? <><CheckCircle className="h-4 w-4" /> Exported!</> : <><Download className="h-4 w-4" /> Export report</>}
         </button>
       } />
 
@@ -660,15 +813,30 @@ function AnalyticsPage() {
 function KnowledgeBasePage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [opening, setOpening] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
   const categories = ["All", "Azure", "Security", "Data", "DevOps", "Compliance"];
   const filtered = knowledgeResources.filter(r =>
     (filter === "All" || r.category === filter) &&
     r.title.toLowerCase().includes(search.toLowerCase())
   );
   const typeIcon: Record<string, string> = { PDF: "📄", Article: "📝", Video: "🎥", Course: "🎓", Lab: "🧪" };
+  const handleOpen = (title: string, type: string) => {
+    setOpening(title);
+    setTimeout(() => {
+      setOpening(null);
+      setToast(`Opening ${type}: ${title.slice(0, 40)}…`);
+      setTimeout(() => setToast(""), 3000);
+    }, 800);
+  };
 
   return (
     <div className="space-y-5">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+        </div>
+      )}
       <PageHeader title="Knowledge Base" subtitle="Approved learning resources, guides, and reference material." />
 
       <div className="flex items-center gap-3">
@@ -678,7 +846,7 @@ function KnowledgeBasePage() {
         </div>
         <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
           {categories.map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:text-slate-700")}>
+            <button key={f} onClick={() => setFilter(f)} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer", filter === f ? "bg-indigo-700 text-white" : "text-slate-500 hover:text-slate-700")}>
               {f}
             </button>
           ))}
@@ -700,8 +868,13 @@ function KnowledgeBasePage() {
               </div>
               <div className="mt-1 text-xs text-slate-400">Updated {r.updated}</div>
             </div>
-            <button className="shrink-0 flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              <ExternalLink className="h-3 w-3" /> Open
+            <button
+              onClick={() => handleOpen(r.title, r.type)}
+              disabled={opening === r.title}
+              className="shrink-0 flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {opening === r.title ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
+              {opening === r.title ? "Opening…" : "Open"}
             </button>
           </div>
         ))}
@@ -712,10 +885,34 @@ function KnowledgeBasePage() {
 
 function SettingsPage() {
   const [saved, setSaved] = useState(false);
+  const [pwToast, setPwToast] = useState("");
+  const [notifs, setNotifs] = useState({ studyReminders: true, assessmentResults: true, managerInsights: false, liveSessions: true, milestones: true });
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<string>>(new Set(["Microsoft 365", "Microsoft Teams", "Azure AI Foundry"]));
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const showPwToast = (msg: string) => { setPwToast(msg); setTimeout(() => setPwToast(""), 3000); };
+
+  const notifItems = [
+    { key: "studyReminders" as const, label: "Study reminders", desc: "Daily nudges from the Engagement Agent" },
+    { key: "assessmentResults" as const, label: "Assessment results", desc: "When AI grades your practice session" },
+    { key: "managerInsights" as const, label: "Manager insights", desc: "Weekly readiness digest for your team" },
+    { key: "liveSessions" as const, label: "Live session alerts", desc: "30 min before a session starts" },
+    { key: "milestones" as const, label: "Milestone celebrations", desc: "When you complete a learning module" },
+  ];
+
+  const integrationList = [
+    { label: "Microsoft 365", desc: "Calendar and Work IQ signals", icon: Globe },
+    { label: "Microsoft Teams", desc: "Session notifications and nudges", icon: Slack },
+    { label: "Azure AI Foundry", desc: "7-agent orchestration backend", icon: BrainCircuit },
+    { label: "SharePoint", desc: "Knowledge base sync", icon: Link2 },
+  ];
 
   return (
     <div className="space-y-5">
+      {pwToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" /> {pwToast}
+        </div>
+      )}
       <PageHeader title="Settings" subtitle="Manage your profile, notifications, and integrations." />
 
       <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
@@ -728,7 +925,7 @@ function SettingsPage() {
               <div>
                 <div className="font-semibold text-slate-900">Alex Johnson</div>
                 <div className="text-sm text-slate-500">Cloud Operations Engineer</div>
-                <button className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700">Change photo</button>
+                <button onClick={() => showPwToast("Photo upload coming soon!")} className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">Change photo</button>
               </div>
             </div>
             <div className="mt-5 space-y-3">
@@ -738,7 +935,7 @@ function SettingsPage() {
                   <input defaultValue={f.value} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200" />
                 </div>
               ))}
-              <button onClick={save} className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+              <button onClick={save} className="flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 transition-colors cursor-pointer">
                 {saved ? <><CheckCircle className="h-4 w-4" /> Saved!</> : "Save changes"}
               </button>
             </div>
@@ -747,11 +944,11 @@ function SettingsPage() {
           <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-slate-900">Security</h2>
             <div className="mt-4 space-y-3">
-              <button className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
+              <button onClick={() => showPwToast("Password reset email sent!")} className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
                 <span className="flex items-center gap-2"><Lock className="h-4 w-4 text-slate-400" />Change password</span>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </button>
-              <button className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
+              <button onClick={() => showPwToast("Two-factor authentication is already enabled.")} className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
                 <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-slate-400" />Two-factor authentication</span>
                 <span className="text-xs font-semibold text-emerald-600">Enabled</span>
               </button>
@@ -764,20 +961,20 @@ function SettingsPage() {
           <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-slate-900">Notifications</h2>
             <div className="mt-4 space-y-3">
-              {[
-                { label: "Study reminders", desc: "Daily nudges from the Engagement Agent", on: true },
-                { label: "Assessment results", desc: "When AI grades your practice session", on: true },
-                { label: "Manager insights", desc: "Weekly readiness digest for your team", on: false },
-                { label: "Live session alerts", desc: "30 min before a session starts", on: true },
-                { label: "Milestone celebrations", desc: "When you complete a learning module", on: true },
-              ].map(n => (
-                <div key={n.label} className="flex items-center justify-between py-1">
+              {notifItems.map(n => (
+                <div key={n.key} className="flex items-center justify-between py-1">
                   <div>
                     <div className="text-sm font-medium text-slate-900">{n.label}</div>
                     <div className="text-xs text-slate-500">{n.desc}</div>
                   </div>
-                  <button className={cn("relative h-6 w-11 rounded-full transition-colors", n.on ? "bg-indigo-600" : "bg-slate-200")} aria-label="Toggle">
-                    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", n.on ? "translate-x-5" : "translate-x-0.5")} />
+                  <button
+                    onClick={() => setNotifs(prev => ({ ...prev, [n.key]: !prev[n.key] }))}
+                    className={cn("relative h-6 w-11 rounded-full transition-colors cursor-pointer", notifs[n.key] ? "bg-indigo-600" : "bg-slate-200")}
+                    aria-label={`Toggle ${n.label}`}
+                    role="switch"
+                    aria-checked={notifs[n.key]}
+                  >
+                    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", notifs[n.key] ? "translate-x-5" : "translate-x-0.5")} />
                   </button>
                 </div>
               ))}
@@ -788,29 +985,33 @@ function SettingsPage() {
           <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-slate-900">Integrations</h2>
             <div className="mt-4 space-y-3">
-              {[
-                { label: "Microsoft 365", desc: "Calendar and Work IQ signals", icon: Globe, connected: true },
-                { label: "Microsoft Teams", desc: "Session notifications and nudges", icon: Slack, connected: true },
-                { label: "Azure AI Foundry", desc: "7-agent orchestration backend", icon: BrainCircuit, connected: true },
-                { label: "SharePoint", desc: "Knowledge base sync", icon: Link2, connected: false },
-              ].map(i => (
-                <div key={i.label} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
-                      <i.icon className="h-4 w-4 text-slate-600" />
+              {integrationList.map(intg => {
+                const isConnected = connectedIntegrations.has(intg.label);
+                return (
+                  <div key={intg.label} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                        <intg.icon className="h-4 w-4 text-slate-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{intg.label}</div>
+                        <div className="text-xs text-slate-500">{intg.desc}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{i.label}</div>
-                      <div className="text-xs text-slate-500">{i.desc}</div>
-                    </div>
+                    <button
+                      onClick={() => {
+                        setConnectedIntegrations(prev => { const n = new Set(prev); isConnected ? n.delete(intg.label) : n.add(intg.label); return n; });
+                        showPwToast(isConnected ? `Disconnected ${intg.label}` : `Connected to ${intg.label}!`);
+                      }}
+                      className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer",
+                        isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
+                      )}
+                    >
+                      {isConnected ? "✓ Connected" : "Connect"}
+                    </button>
                   </div>
-                  <button className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                    i.connected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
-                  )}>
-                    {i.connected ? "✓ Connected" : "Connect"}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1122,7 +1323,10 @@ function DashboardPage({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
+  const [exportingTeam, setExportingTeam] = useState(false);
+  const [exportedTeam, setExportedTeam] = useState(false);
   const toggleBookmark = (title: string) => setBookmarked(prev => { const n = new Set(prev); n.has(title) ? n.delete(title) : n.add(title); return n; });
+  const handleTeamExport = () => { setExportingTeam(true); setTimeout(() => { setExportingTeam(false); setExportedTeam(true); setTimeout(() => setExportedTeam(false), 2500); }, 1800); };
   useEffect(() => { setSelected(null); }, [assessment]);
   const q = assessment?.questions?.[0];
 
@@ -1217,7 +1421,9 @@ function DashboardPage({
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Team Readiness</p>
               <h2 className="text-base font-bold text-slate-900">Certification coverage and risk</h2>
             </div>
-            <Button variant="secondary" className="h-8 text-xs"><BarChart3 className="h-3.5 w-3.5" /> Export</Button>
+            <button onClick={handleTeamExport} disabled={exportingTeam} className={cn("flex items-center gap-1.5 rounded-lg border h-8 px-3 text-xs font-semibold transition-colors cursor-pointer", exportedTeam ? "border-emerald-200 bg-emerald-50 text-emerald-700" : exportingTeam ? "border-slate-200 bg-slate-50 text-slate-400" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")}>
+              {exportingTeam ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Exporting…</> : exportedTeam ? <><CheckCircle className="h-3.5 w-3.5" /> Exported!</> : <><BarChart3 className="h-3.5 w-3.5" /> Export</>}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <div className="min-w-[560px]">
@@ -1374,6 +1580,17 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
 
 function TopHeader({ currentPage, onNavigate }: { currentPage: Page; onNavigate: (p: Page) => void }) {
   const [search, setSearch] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifRead, setNotifRead] = useState(false);
+
+  const notifications = [
+    { title: "Assessment ready", desc: "Your AZ-104 practice session is ready.", time: "2 min ago", icon: "📋" },
+    { title: "Live session starting", desc: "Azure Security Fundamentals in 30 min.", time: "28 min ago", icon: "🎥" },
+    { title: "Milestone reached!", desc: "You completed Identity & Access Management.", time: "1 hr ago", icon: "🏆" },
+    { title: "Manager insight", desc: "Weekly readiness digest is available.", time: "3 hr ago", icon: "📊" },
+  ];
+
   const handleSearch = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && search.trim()) {
       const q = search.toLowerCase();
@@ -1389,19 +1606,55 @@ function TopHeader({ currentPage, onNavigate }: { currentPage: Page; onNavigate:
     }
   };
   return (
-    <header className="flex h-14 items-center gap-4 border-b border-slate-200 bg-white/80 px-6 backdrop-blur-sm">
-      <div className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+    <header className={cn("flex h-14 items-center gap-4 border-b px-6 backdrop-blur-sm transition-colors", darkMode ? "border-slate-700 bg-slate-900/90" : "border-slate-200 bg-white/80")}>
+      <div className={cn("flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-sm", darkMode ? "border-slate-700 bg-slate-800 text-slate-300" : "border-slate-200 bg-slate-50 text-slate-400")}>
         <Search className="h-4 w-4 shrink-0" />
-        <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleSearch} placeholder="Search courses, learners, certifications…" className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleSearch} placeholder="Search courses, learners, certifications…" className={cn("flex-1 bg-transparent outline-none placeholder:text-slate-400", darkMode ? "text-slate-200" : "text-slate-700")} />
       </div>
       <div className="flex items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1 text-xs font-bold text-white">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Live
         </span>
-        <button className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100" aria-label="Dark mode"><Moon className="h-4 w-4" /></button>
-        <button className="relative flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100" aria-label="Notifications">
-          <Bell className="h-4 w-4" /><span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-500" />
+        <button
+          onClick={() => setDarkMode(d => !d)}
+          className={cn("flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer", darkMode ? "bg-indigo-600 text-white hover:bg-indigo-500" : "text-slate-400 hover:bg-slate-100")}
+          aria-label="Toggle dark mode"
+        >
+          <Moon className="h-4 w-4" />
         </button>
+        <div className="relative">
+          <button
+            onClick={() => { setShowNotifs(n => !n); setNotifRead(true); }}
+            className={cn("relative flex h-8 w-8 items-center justify-center rounded-full transition-colors cursor-pointer", darkMode ? "text-slate-300 hover:bg-slate-800" : "text-slate-400 hover:bg-slate-100")}
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            {!notifRead && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-500" />}
+          </button>
+          {showNotifs && (
+            <div className="absolute right-0 top-10 z-50 w-80 rounded-xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <span className="text-sm font-bold text-slate-900">Notifications</span>
+                <button onClick={() => setShowNotifs(false)} className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">Close</button>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {notifications.map((n, i) => (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                    <span className="text-lg">{n.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{n.title}</p>
+                      <p className="text-xs text-slate-500">{n.desc}</p>
+                      <p className="mt-1 text-xs text-slate-400">{n.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-slate-100 px-4 py-2.5">
+                <button onClick={() => setShowNotifs(false)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">Mark all as read</button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">AJ</div>
       </div>
     </header>
