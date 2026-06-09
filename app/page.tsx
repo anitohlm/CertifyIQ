@@ -32,17 +32,24 @@ interface ManagerInsightsResult { teamReadinessScore: string; certificationCover
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 
-const navItems: Array<{ icon: typeof HomeIcon; label: string; page: Page }> = [
-  { icon: HomeIcon, label: "Dashboard", page: "dashboard" },
-  { icon: Sparkles, label: "AI Studio", page: "ai-studio" },
-  { icon: UsersRound, label: "Learners", page: "learners" },
-  { icon: BriefcaseBusiness, label: "Managers", page: "managers" },
-  { icon: GraduationCap, label: "Certifications", page: "certifications" },
-  { icon: PlayCircle, label: "Live Sessions", page: "live-sessions" },
-  { icon: ClipboardCheck, label: "Assessments", page: "assessments" },
-  { icon: BarChart3, label: "Analytics", page: "analytics" },
-  { icon: BookOpen, label: "Knowledge Base", page: "knowledge-base" },
-  { icon: Settings, label: "Settings", page: "settings" },
+const learnerNav: Array<{ icon: typeof HomeIcon; label: string; page: Page }> = [
+  { icon: HomeIcon,       label: "Dashboard",     page: "dashboard" },
+  { icon: Sparkles,       label: "AI Studio",     page: "ai-studio" },
+  { icon: GraduationCap,  label: "Certifications",page: "certifications" },
+  { icon: PlayCircle,     label: "Live Sessions", page: "live-sessions" },
+  { icon: ClipboardCheck, label: "Assessments",   page: "assessments" },
+  { icon: BookOpen,       label: "Knowledge Base",page: "knowledge-base" },
+  { icon: Settings,       label: "Settings",      page: "settings" },
+];
+
+const managerNav: Array<{ icon: typeof HomeIcon; label: string; page: Page }> = [
+  { icon: HomeIcon,          label: "Dashboard",  page: "dashboard" },
+  { icon: Sparkles,          label: "AI Studio",  page: "ai-studio" },
+  { icon: UsersRound,        label: "Learners",   page: "learners" },
+  { icon: BriefcaseBusiness, label: "Managers",   page: "managers" },
+  { icon: BarChart3,         label: "Analytics",  page: "analytics" },
+  { icon: BookOpen,          label: "Knowledge Base", page: "knowledge-base" },
+  { icon: Settings,          label: "Settings",   page: "settings" },
 ];
 
 const agentDefinitions: Array<{ name: AgentId; icon: typeof Layers3; color: string; bg: string }> = [
@@ -1607,8 +1614,18 @@ function AIStudioPage({
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage: Page; onPage: (p: Page) => void; view: "employee" | "manager"; onView: (v: "employee" | "manager") => void; onUpgrade: () => void }) {
+  const nav = view === "employee" ? learnerNav : managerNav;
+
+  const handleViewSwitch = (v: "employee" | "manager") => {
+    onView(v);
+    // redirect to dashboard if current page isn't in the new nav
+    const newNav = v === "employee" ? learnerNav : managerNav;
+    if (!newNav.find(n => n.page === currentPage)) onPage("dashboard");
+  };
+
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
+      {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-700 text-white">
           <BrainCircuit className="h-4 w-4" />
@@ -1616,16 +1633,50 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
         <span className="text-base font-bold text-slate-900">CertifyIQ</span>
       </div>
 
-      <div className="mx-4 mb-4 flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
-        <button onClick={() => onView("employee")} className={cn("flex-1 rounded-md py-1.5 transition-colors", view === "employee" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Learner</button>
-        <button onClick={() => onView("manager")} className={cn("flex-1 rounded-md py-1.5 transition-colors", view === "manager" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Manager</button>
+      {/* Learner / Manager tabs */}
+      <div className="px-4 mb-2">
+        <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+          <button
+            onClick={() => handleViewSwitch("employee")}
+            className={cn(
+              "flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors",
+              view === "employee"
+                ? "bg-indigo-700 text-white"
+                : "bg-white text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            <GraduationCap className="h-4 w-4" />
+            Learner
+          </button>
+          <button
+            onClick={() => handleViewSwitch("manager")}
+            className={cn(
+              "flex flex-1 flex-col items-center gap-0.5 border-l border-slate-200 py-2.5 transition-colors",
+              view === "manager"
+                ? "bg-indigo-700 text-white border-indigo-700"
+                : "bg-white text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            <BriefcaseBusiness className="h-4 w-4" />
+            Manager
+          </button>
+        </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
-        {navItems.map(({ icon: Icon, label, page }) => (
+      {/* Nav label */}
+      <p className="px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {view === "employee" ? "Learner Menu" : "Manager Menu"}
+      </p>
+
+      {/* Nav items */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
+        {nav.map(({ icon: Icon, label, page }) => (
           <button key={page} onClick={() => onPage(page)}
-            className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-              currentPage === page ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              currentPage === page
+                ? "bg-indigo-50 text-indigo-700"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             )}>
             <Icon className="h-4 w-4 shrink-0" />
             {label}
@@ -1633,10 +1684,11 @@ function Sidebar({ currentPage, onPage, view, onView, onUpgrade }: { currentPage
         ))}
       </nav>
 
+      {/* Upgrade card */}
       <div className="m-4 rounded-xl bg-indigo-700 p-4 text-white">
         <Sparkles className="h-5 w-5 text-indigo-200" />
         <p className="mt-2 text-xs font-semibold leading-5 text-indigo-100">Upgrade to Pro for AI coaching, full analytics, and team insights.</p>
-        <button onClick={onUpgrade} className="mt-3 w-full rounded-lg bg-white py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50">Upgrade →</button>
+        <button onClick={onUpgrade} className="mt-3 w-full rounded-lg bg-white py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 cursor-pointer">Upgrade →</button>
       </div>
     </aside>
   );
