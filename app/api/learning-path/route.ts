@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, extractJSON } from "@/lib/agents/foundry";
+import { callAgent, callAI, extractJSON } from "@/lib/agents/foundry";
+
+const AGENT_ID = process.env.AGENT_LEARNING_PATH;
 
 const SYSTEM_PROMPT = `You are the Learning Path Curator Agent for CertifyIQ.
 Your responsibility is to analyze employee learning goals, role requirements, certifications, competencies, and available learning resources to recommend the most relevant learning path.
@@ -13,16 +15,16 @@ Objectives:
 Only recommend approved learning content. Explain why each module is recommended. Avoid duplicate content. Prioritize competency gaps.
 Always respond with valid JSON only, no markdown.`;
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { role, targetCertification, skillsInventory, experienceLevel } = body;
-
-    const userMessage = `Generate a learning path recommendation for:
-- Role: ${role}
-- Target Certification: ${targetCertification}
-- Skills Inventory: ${skillsInventory}
-- Experience Level: ${experienceLevel}
+const buildMessage = (body: {
+  role: string;
+  targetCertification: string;
+  skillsInventory: string;
+  experienceLevel: string;
+}) => `Generate a learning path recommendation for:
+- Role: ${body.role}
+- Target Certification: ${body.targetCertification}
+- Skills Inventory: ${body.skillsInventory}
+- Experience Level: ${body.experienceLevel}
 
 Return JSON in this exact format:
 {
@@ -34,7 +36,16 @@ Return JSON in this exact format:
   "priorityAreas": []
 }`;
 
-    const raw = await callAI(SYSTEM_PROMPT, userMessage);
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const message = buildMessage(body);
+
+    // Use the real Foundry Agent if the ID is configured, otherwise fall back to chat completions
+    const raw = AGENT_ID
+      ? await callAgent(AGENT_ID, message)
+      : await callAI(SYSTEM_PROMPT, message);
+
     const result = extractJSON(raw);
     return NextResponse.json(result);
   } catch (err: unknown) {
