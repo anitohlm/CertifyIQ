@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Page = "dashboard" | "learners" | "managers" | "certifications" | "live-sessions" | "assessments" | "analytics" | "knowledge-base" | "settings";
+type Page = "dashboard" | "learners" | "managers" | "certifications" | "live-sessions" | "assessments" | "analytics" | "knowledge-base" | "settings" | "ai-studio";
 type AgentId = "Learning Path Curator" | "Study Plan Generator" | "Work IQ Agent" | "Engagement Agent" | "Assessment Agent" | "Progress Intelligence" | "Manager Insights";
 type AgentStatus = "idle" | "processing" | "done" | "error";
 
@@ -34,6 +34,7 @@ interface ManagerInsightsResult { teamReadinessScore: string; certificationCover
 
 const navItems: Array<{ icon: typeof HomeIcon; label: string; page: Page }> = [
   { icon: HomeIcon, label: "Dashboard", page: "dashboard" },
+  { icon: Sparkles, label: "AI Studio", page: "ai-studio" },
   { icon: UsersRound, label: "Learners", page: "learners" },
   { icon: BriefcaseBusiness, label: "Managers", page: "managers" },
   { icon: GraduationCap, label: "Certifications", page: "certifications" },
@@ -1298,37 +1299,12 @@ function CoachingExchange({ view }: { view: "employee" | "manager" }) {
   );
 }
 
-function DashboardPage({
-  view, agentStatuses, chainRunning, insightsLoading,
-  learningPath, studyPlan, workIQ, assessment, assessmentLoading,
-  managerInsights, insightsLoadingProp,
-  onRunChain, onRunInsights, onGenerateAssessment, setAgent, onNavigate
-}: {
-  view: "employee" | "manager";
-  agentStatuses: Record<string, AgentStatus>;
-  chainRunning: boolean;
-  insightsLoading: boolean;
-  learningPath: LearningPathResult | null;
-  studyPlan: StudyPlanResult | null;
-  workIQ: WorkIQResult | null;
-  assessment: AssessmentResult | null;
-  assessmentLoading: boolean;
-  managerInsights: ManagerInsightsResult | null;
-  insightsLoadingProp: boolean;
-  onRunChain: () => void;
-  onRunInsights: () => void;
-  onGenerateAssessment: () => void;
-  setAgent: (name: string, status: AgentStatus) => void;
-  onNavigate: (p: Page) => void;
-}) {
-  const [selected, setSelected] = useState<string | null>(null);
+function DashboardPage({ view, onNavigate }: { view: "employee" | "manager"; onNavigate: (p: Page) => void }) {
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
   const [exportingTeam, setExportingTeam] = useState(false);
   const [exportedTeam, setExportedTeam] = useState(false);
   const toggleBookmark = (title: string) => setBookmarked(prev => { const n = new Set(prev); n.has(title) ? n.delete(title) : n.add(title); return n; });
   const handleTeamExport = () => { setExportingTeam(true); setTimeout(() => { setExportingTeam(false); setExportedTeam(true); setTimeout(() => setExportedTeam(false), 2500); }, 1800); };
-  useEffect(() => { setSelected(null); }, [assessment]);
-  const q = assessment?.questions?.[0];
 
   return (
     <div className="space-y-5">
@@ -1348,10 +1324,10 @@ function DashboardPage({
           <p className="mt-1.5 max-w-lg text-sm leading-6 text-indigo-100">
             {view === "employee" ? "CertifyIQ AI identified 3 high-quality study windows this week." : "CertifyIQ AI surfaces certification risk, coverage gaps, and completion forecasts."}
           </p>
-          <button onClick={view === "employee" ? onRunChain : onRunInsights} disabled={chainRunning || insightsLoading}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-70">
-            {(chainRunning || insightsLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {view === "employee" ? (chainRunning ? "Running agents…" : "Generate my learning path") : (insightsLoading ? "Analyzing…" : "Generate team insights")}
+          <button onClick={() => onNavigate("ai-studio")}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 cursor-pointer">
+            <Sparkles className="h-4 w-4" />
+            {view === "employee" ? "Open AI Studio" : "Open AI Studio"}
           </button>
         </div>
       </div>
@@ -1367,51 +1343,6 @@ function DashboardPage({
         ))}
       </div>
 
-      {/* AI results */}
-      {view === "employee" && learningPath && <LearningPathPanel result={learningPath} studyPlan={studyPlan} workIQ={workIQ} />}
-      {view === "manager" && (insightsLoadingProp || managerInsights) && (
-        insightsLoadingProp ? (
-          <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-5 text-sm text-slate-500 shadow-sm">
-            <Loader2 className="h-4 w-4 animate-spin text-indigo-500" /> Manager Insights Agent analyzing team data…
-          </div>
-        ) : managerInsights && (
-          <div className="rounded-xl border border-indigo-100 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Radar className="h-4 w-4 text-rose-600" />
-              <h2 className="text-sm font-bold text-slate-900">AI Manager Insights</h2>
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">Forecasted: {managerInsights.forecastedCompletion}</span>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {managerInsights.skillGapSummary?.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Skill Gaps</p>
-                  <div className="space-y-1.5">
-                    {managerInsights.skillGapSummary.map((g, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-                        <span className="font-medium text-slate-700">{g.skill}</span>
-                        <StatusBadge status={g.urgency} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {managerInsights.managerRecommendations?.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Recommendations</p>
-                  <div className="space-y-1.5">
-                    {managerInsights.managerRecommendations.map((r, i) => (
-                      <div key={i} className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs">
-                        <div className="font-semibold text-slate-800">{r.action}</div>
-                        <div className="text-slate-500">{r.impact}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      )}
 
       {/* Manager team table */}
       {view === "manager" && (
@@ -1497,7 +1428,140 @@ function DashboardPage({
         </div>
       </div>
 
-      {/* Assessment */}
+    </div>
+  );
+}
+
+// ─── AI Studio Page ───────────────────────────────────────────────────────────
+
+function AIStudioPage({
+  view, agentStatuses, chainRunning, insightsLoading,
+  learningPath, studyPlan, workIQ,
+  assessment, assessmentLoading,
+  managerInsights, insightsLoadingProp,
+  onRunChain, onRunInsights, onGenerateAssessment,
+}: {
+  view: "employee" | "manager";
+  agentStatuses: Record<string, AgentStatus>;
+  chainRunning: boolean;
+  insightsLoading: boolean;
+  learningPath: LearningPathResult | null;
+  studyPlan: StudyPlanResult | null;
+  workIQ: WorkIQResult | null;
+  assessment: AssessmentResult | null;
+  assessmentLoading: boolean;
+  managerInsights: ManagerInsightsResult | null;
+  insightsLoadingProp: boolean;
+  onRunChain: () => void;
+  onRunInsights: () => void;
+  onGenerateAssessment: () => void;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => { setSelected(null); }, [assessment]);
+  const q = assessment?.questions?.[0];
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="AI Studio"
+        subtitle="Your 7 Azure AI Foundry agents — generate learning paths, study plans, assessments, and insights."
+        action={
+          <button
+            onClick={view === "employee" ? onRunChain : onRunInsights}
+            disabled={chainRunning || insightsLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-60 transition-colors cursor-pointer"
+          >
+            {(chainRunning || insightsLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {view === "employee"
+              ? chainRunning ? "Running agents…" : "Generate my learning path"
+              : insightsLoading ? "Analyzing…" : "Generate team insights"}
+          </button>
+        }
+      />
+
+      {/* Agent status strip */}
+      <div className="flex flex-wrap gap-2">
+        {agentDefinitions.map(a => {
+          const status = agentStatuses[a.name] ?? "idle";
+          return (
+            <div key={a.name} className={cn("flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+              status === "idle" && "border-slate-200 bg-white text-slate-500",
+              status === "processing" && "border-indigo-200 bg-indigo-50 text-indigo-700",
+              status === "done" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+              status === "error" && "border-rose-200 bg-rose-50 text-rose-600",
+            )}>
+              <a.icon className={cn("h-3.5 w-3.5", a.color)} />
+              {a.name}
+              {status === "processing" && <Loader2 className="h-3 w-3 animate-spin" />}
+              {status === "done" && <CheckCircle className="h-3 w-3 text-emerald-500" />}
+              {status === "error" && <AlertCircle className="h-3 w-3 text-rose-500" />}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Employee: learning path results */}
+      {view === "employee" && !chainRunning && !learningPath && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-16 text-center">
+          <Sparkles className="h-8 w-8 text-indigo-300 mb-3" />
+          <p className="text-sm font-semibold text-slate-700">No learning path generated yet</p>
+          <p className="mt-1 text-xs text-slate-400">Click "Generate my learning path" to run all 5 agents in sequence.</p>
+        </div>
+      )}
+      {view === "employee" && learningPath && <LearningPathPanel result={learningPath} studyPlan={studyPlan} workIQ={workIQ} />}
+
+      {/* Manager: insights results */}
+      {view === "manager" && !insightsLoadingProp && !managerInsights && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-16 text-center">
+          <Radar className="h-8 w-8 text-indigo-300 mb-3" />
+          <p className="text-sm font-semibold text-slate-700">No team insights generated yet</p>
+          <p className="mt-1 text-xs text-slate-400">Click "Generate team insights" to analyze team readiness and skill gaps.</p>
+        </div>
+      )}
+      {view === "manager" && insightsLoadingProp && (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-5 text-sm text-slate-500 shadow-sm">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-500" /> Manager Insights Agent analyzing team data…
+        </div>
+      )}
+      {view === "manager" && managerInsights && !insightsLoadingProp && (
+        <div className="rounded-xl border border-indigo-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Radar className="h-4 w-4 text-rose-600" />
+            <h2 className="text-sm font-bold text-slate-900">AI Manager Insights</h2>
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">Forecasted: {managerInsights.forecastedCompletion}</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {managerInsights.skillGapSummary?.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Skill Gaps</p>
+                <div className="space-y-1.5">
+                  {managerInsights.skillGapSummary.map((g, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                      <span className="font-medium text-slate-700">{g.skill}</span>
+                      <StatusBadge status={g.urgency} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {managerInsights.managerRecommendations?.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Recommendations</p>
+                <div className="space-y-1.5">
+                  {managerInsights.managerRecommendations.map((r, i) => (
+                    <div key={i} className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs">
+                      <div className="font-semibold text-slate-800">{r.action}</div>
+                      <div className="text-slate-500">{r.impact}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AI Assessment */}
       <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1506,7 +1570,7 @@ function DashboardPage({
             {assessment?.readinessScore && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">Readiness: {assessment.readinessScore}</span>}
           </div>
           <button onClick={() => { setSelected(null); onGenerateAssessment(); }} disabled={assessmentLoading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 cursor-pointer">
             {assessmentLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             New question
           </button>
@@ -1519,7 +1583,7 @@ function DashboardPage({
               {q.options?.map((opt, i) => {
                 const isCorrect = opt === q.correctAnswer, isSelected = opt === selected;
                 return (
-                  <button key={i} onClick={() => setSelected(opt)} className={cn("w-full rounded-lg border px-4 py-2.5 text-left text-sm transition-colors",
+                  <button key={i} onClick={() => setSelected(opt)} className={cn("w-full rounded-lg border px-4 py-2.5 text-left text-sm transition-colors cursor-pointer",
                     !selected && "border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/50",
                     selected && isCorrect && "border-emerald-300 bg-emerald-50 font-semibold text-emerald-800",
                     selected && isSelected && !isCorrect && "border-rose-300 bg-rose-50 text-rose-800",
@@ -1534,7 +1598,7 @@ function DashboardPage({
         {!assessmentLoading && !q && <div className="mt-4 rounded-lg border border-slate-200 bg-white/75 p-4 text-sm text-slate-500">Click "New question" to generate an AI-grounded practice question.</div>}
       </div>
 
-      {/* Coaching */}
+      {/* AI Coach */}
       <CoachingExchange view={view} />
     </div>
   );
@@ -1727,7 +1791,7 @@ export default function Home() {
   }, [assessmentLoading, setAgent]);
 
   // Pages that show the right panel
-  const showRightPanel = currentPage === "dashboard";
+  const showRightPanel = currentPage === "dashboard" || currentPage === "ai-studio";
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -1737,15 +1801,15 @@ export default function Home() {
         <TopHeader currentPage={currentPage} onNavigate={setCurrentPage} />
         <main className={cn("flex flex-1 gap-5 overflow-y-auto p-5", !showRightPanel && "")}>
           <div className="flex-1 min-w-0">
-            {currentPage === "dashboard" && (
-              <DashboardPage
+            {currentPage === "dashboard" && <DashboardPage view={view} onNavigate={setCurrentPage} />}
+            {currentPage === "ai-studio" && (
+              <AIStudioPage
                 view={view} agentStatuses={agentStatuses} chainRunning={chainRunning} insightsLoading={insightsLoading}
                 learningPath={learningPath} studyPlan={studyPlan} workIQ={workIQ}
                 assessment={assessment} assessmentLoading={assessmentLoading}
                 managerInsights={managerInsights} insightsLoadingProp={insightsLoading}
                 onRunChain={runEmployeeChain} onRunInsights={runManagerInsights}
-                onGenerateAssessment={generateAssessment} setAgent={setAgent}
-                onNavigate={setCurrentPage}
+                onGenerateAssessment={generateAssessment}
               />
             )}
             {currentPage === "learners" && <LearnersPage />}
